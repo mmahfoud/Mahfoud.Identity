@@ -93,4 +93,12 @@ public partial class ApplicationDbContext : IdentityDbContext<User, IdentityRole
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+
+    public string? Provider
+    {
+        get
+        {
+            return this.Database.ProviderName;
+        }
+    } 
 }

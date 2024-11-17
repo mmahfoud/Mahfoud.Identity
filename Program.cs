@@ -12,13 +12,13 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
-using System.Text.Json.Nodes;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Default");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()//.EnableSensitiveDataLogging()
+    // options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()//.EnableSensitiveDataLogging()
+    options.UseSqlServer(connectionString)
 );
 
 builder.Services.AddIdentity<User, IdentityRole<long>>(options => options.SignIn.RequireConfirmedAccount = true)
