@@ -4,6 +4,7 @@ using Mahfoud.Identity.DTOs;
 using Mahfoud.Identity.Entities;
 using Mahfoud.Identity.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
@@ -35,9 +36,22 @@ builder.Services.Configure<IdentityOptions>(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.TagActionsBy(api =>
+    {
+        var tags = new List<string>();
+
+        tags.AddRange(api.ActionDescriptor.EndpointMetadata.OfType<TagsAttribute>().SelectMany(x => x.Tags));
+        var attribute = api.ActionDescriptor.EndpointMetadata.OfType<ApiExplorerSettingsAttribute>().FirstOrDefault();
+        tags.Add(attribute?.GroupName ?? api.GroupName ?? "Default");
+
+        return tags;
+    });
+});
 builder.Services.AddAuthentication().AddJwtBearer();
 builder.Services.AddAuthorization();
+builder.Services.AddControllers();
 
 builder.Services.AddTransient<IEmailSender, SimpleEmailSender>();
 
@@ -52,6 +66,31 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 //app.MapToDoEndpoints();
+
+app.MapMethods("/show", ["GET", "POST", "DELETE", "PUT", "HEAD"], (IEnumerable<EndpointDataSource> sources) =>
+{
+    var endpoints = sources.SelectMany(es => es.Endpoints)
+    .Select(e => new
+    {
+        Summaries = string.Join(", ", e.Metadata.OfType<EndpointSummaryAttribute>().Select(x => x.Summary)),
+        Order = (e as RouteEndpoint)?.Order,
+        DisplayName = e.DisplayName,
+        Descriptions = string.Join(", ", e.Metadata.OfType<IEndpointDescriptionMetadata>().Select(x => x.Description)),
+        Methods = string.Join("\n", e.Metadata.OfType<HttpMethodMetadata>().Select(x => string.Join(", ", x.HttpMethods))),
+        Pattern = (e as RouteEndpoint)?.RoutePattern.RawText,
+        Names = string.Join(", ", e.Metadata.OfType<EndpointNameMetadata>().Select(x => x.EndpointName)),
+        Tags = string.Join("\n", e.Metadata.OfType<TagsAttribute>().Select(x => string.Join(", ", x.Tags))),
+        GroupNames = string.Join(", ", e.Metadata.OfType<EndpointGroupNameAttribute>().Select(x => x.EndpointGroupName))
+    });
+
+    return Results.Json(endpoints);
+})
+.WithName("ShowAll")
+.WithTags("TryThis", "AndTryThat")
+.WithDisplayName("Mahfoud")
+.WithDescription("Please read this description!")
+//.WithGroupName("Standard")
+.WithOrder(-1);
 
 app.MapGet("/me", async Task<Ok<ProfileDTO>>(UserManager<User> _userManager, ClaimsPrincipal cp) =>
 {
@@ -132,4 +171,59 @@ app.MapToDoListEndpoints();
 
 app.MapToDoItemEndpoints();
 
-app.Run();
+app.MapControllers();
+//app.UseRouting();
+
+//app.UseEndpoints(b =>
+//{
+//    // Retrieve the EndpointDataSource service to enumerate endpoints
+//    var endpointDataSources = b.DataSources;
+
+//    Console.WriteLine("Enumerating all registered endpoints:");
+
+//    foreach (var endpoint in endpointDataSources.SelectMany(x => x.Endpoints))
+//    {
+//        Console.WriteLine($"==============\n***{endpoint}:");
+//        if (endpoint is RouteEndpoint routeEndpoint)
+//        {
+
+//            // Print the route pattern
+//            Console.WriteLine($"\tPattern: {routeEndpoint.RoutePattern.RawText}\n\tOrder: {routeEndpoint.Order}\n\tDisplay Name: {routeEndpoint.DisplayName}");
+
+//            // Print metadata (e.g., HTTP methods, custom metadata, etc.)
+//            var httpMethods = routeEndpoint.Metadata
+//                .OfType<HttpMethodMetadata>()
+//                .FirstOrDefault()?.HttpMethods;
+//            Console.WriteLine($"\tHTTP Methods: {string.Join(", ", httpMethods ?? new List<string>())}");
+//        }
+//    }
+//});
+
+// await Task.Delay(1000);
+app.Use(next =>
+{
+    var scope = app.Services.CreateScope();
+    var endpointSources = scope.ServiceProvider.GetRequiredService<IEnumerable<EndpointDataSource>>();
+
+    Console.WriteLine("Enumerating all registered endpoints:");
+
+    foreach (var endpoint in endpointSources.SelectMany(x => x.Endpoints))
+    {
+        Console.WriteLine($"==============\n***{endpoint}:");
+        if (endpoint is RouteEndpoint routeEndpoint)
+        {
+
+            // Print the route pattern
+            Console.WriteLine($"\tPattern: {routeEndpoint.RoutePattern.RawText}\n\tOrder: {routeEndpoint.Order}\n\tDisplay Name: {routeEndpoint.DisplayName}");
+
+            // Print metadata (e.g., HTTP methods, custom metadata, etc.)
+            var httpMethods = routeEndpoint.Metadata
+                .OfType<HttpMethodMetadata>()
+                .FirstOrDefault()?.HttpMethods;
+            Console.WriteLine($"\tHTTP Methods: {string.Join(", ", httpMethods ?? new List<string>())}");
+        }
+    }
+    return next;
+});
+
+await app.RunAsync();

@@ -13,7 +13,12 @@ public static class ToDoItemEndpoints
 {
     public static void MapToDoItemEndpoints (this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/api/ToDoItem").WithTags(nameof(ToDoItem));
+        var group = routes.MapGroup("/api/ToDoItem")
+            //.WithTags(nameof(ToDoItem))
+            .WithDescription("Items group description")
+            .WithDisplayName("Items management")
+            .WithTags("Management of Items")
+            .WithSummary("Items group summary");
 
         group.MapGet("/by-list/{listId}", async Task<Results<Ok<List<ToDoItemDTO>>, UnauthorizedHttpResult>>(long listId, ApplicationDbContext db, ClaimsPrincipal cp) =>
         {
